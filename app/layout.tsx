@@ -16,6 +16,9 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Langsy Ai Agent",
   description: "A modern chat application built with Next.js and Convex",
+  icons: {
+    icon: '/favicon.ico',
+  },
 };
 
 export default function RootLayout({

@@ -14,6 +14,7 @@ import {
 } from "@langchain/langgraph";
 import { MemorySaver } from "@langchain/langgraph";
 import { ToolNode } from "@langchain/langgraph/prebuilt";
+import { StructuredTool } from "@langchain/core/tools";
 import wxflows from "@wxflows/sdk/langchain";
 import {
   ChatPromptTemplate,
@@ -32,7 +33,7 @@ const trimmer = trimMessages({
 });
 
 // Cache for tools and toolNode to avoid re-initialization
-let toolsCache: any[] | null = null;
+let toolsCache: StructuredTool[] | null = null;
 let toolNodeCache: ToolNode | null = null;
 
 // Initialize tools and toolNode (called on demand)
@@ -65,7 +66,7 @@ const initializeTools = async () => {
 };
 
 // Connect to the LLM provider with better tool instructions
-const initialiseModel = (tools: any[]) => {
+const initialiseModel = (tools: StructuredTool[]) => {
   const model = new ChatAnthropic({
     modelName: "claude-3-5-sonnet-20241022",
     anthropicApiKey: process.env.ANTHROPIC_API_KEY,

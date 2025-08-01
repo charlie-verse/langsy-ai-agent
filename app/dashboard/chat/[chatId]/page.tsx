@@ -6,13 +6,13 @@ import { redirect } from "next/navigation";
 import { auth } from "@clerk/nextjs/server";
 
 interface ChatPageProps {
-  params: {
+  params: Promise<{
     chatId: string;
-  };
+  }>;
 }
 
 export default async function ChatPage({ params }: ChatPageProps) {
-  const { chatId } = params;
+  const { chatId } = await params;
 
   // Get user authentication
   const { userId } = await auth();

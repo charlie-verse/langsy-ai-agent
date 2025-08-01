@@ -31,18 +31,41 @@ const trimmer = trimMessages({
   startOn: "human",
 });
 
-// Connect to wxflows
-const toolClient = new wxflows({
-  endpoint: process.env.WXFLOWS_ENDPOINT || "",
-  apikey: process.env.WXFLOWS_APIKEY,
-});
+// Cache for tools and toolNode to avoid re-initialization
+let toolsCache: any[] | null = null;
+let toolNodeCache: ToolNode | null = null;
 
-// Retrieve the tools
-const tools = await toolClient.lcTools;
-const toolNode = new ToolNode(tools);
+// Initialize tools and toolNode (called on demand)
+const initializeTools = async () => {
+  if (toolsCache && toolNodeCache) {
+    return { tools: toolsCache, toolNode: toolNodeCache };
+  }
+
+  try {
+    // Connect to wxflows
+    const toolClient = new wxflows({
+      endpoint: process.env.WXFLOWS_ENDPOINT || "",
+      apikey: process.env.WXFLOWS_APIKEY,
+    });
+
+    // Retrieve the tools
+    const tools = await toolClient.lcTools;
+    const toolNode = new ToolNode(tools);
+
+    // Cache the tools
+    toolsCache = tools;
+    toolNodeCache = toolNode;
+
+    return { tools, toolNode };
+  } catch (error) {
+    console.error("Error initializing tools:", error);
+    // Return empty tools if initialization fails
+    return { tools: [], toolNode: new ToolNode([]) };
+  }
+};
 
 // Connect to the LLM provider with better tool instructions
-const initialiseModel = () => {
+const initialiseModel = (tools: any[]) => {
   const model = new ChatAnthropic({
     modelName: "claude-3-5-sonnet-20241022",
     anthropicApiKey: process.env.ANTHROPIC_API_KEY,
@@ -103,8 +126,10 @@ function shouldContinue(state: typeof MessagesAnnotation.State) {
 }
 
 // Define a new graph(workflow)
-const createWorkflow = () => {
-  const model = initialiseModel();
+const createWorkflow = async () => {
+  // Initialize tools asynchronously
+  const { tools, toolNode } = await initializeTools();
+  const model = initialiseModel(tools);
 
   return new StateGraph(MessagesAnnotation)
     .addNode("agent", async (state) => {
@@ -174,25 +199,30 @@ function addCachingHeaders(messages: BaseMessage[]): BaseMessage[] {
 }
 
 export async function submitQuestion(messages: BaseMessage[], chatId: string) {
-  // Add caching headers to messages
-  const cachedMessages = addCachingHeaders(messages);
-  // console.log("🔒🔒🔒 Messages:", cachedMessages);
+  try {
+    // Add caching headers to messages
+    const cachedMessages = addCachingHeaders(messages);
+    // console.log("🔒🔒🔒 Messages:", cachedMessages);
 
-  // Create workflow with chatId and onToken callback
-  const workflow = createWorkflow();
+    // Create workflow with chatId and onToken callback
+    const workflow = await createWorkflow();
 
-  // Create a checkpoint to save the state of the conversation
-  const checkpointer = new MemorySaver();
-  const app = workflow.compile({ checkpointer });
+    // Create a checkpoint to save the state of the conversation
+    const checkpointer = new MemorySaver();
+    const app = workflow.compile({ checkpointer });
 
-  const stream = await app.streamEvents(
-    { messages: cachedMessages },
-    {
-      version: "v2",
-      configurable: { thread_id: chatId },
-      streamMode: "messages",
-      runId: chatId,
-    }
-  );
-  return stream;
+    const stream = await app.streamEvents(
+      { messages: cachedMessages },
+      {
+        version: "v2",
+        configurable: { thread_id: chatId },
+        streamMode: "messages",
+        runId: chatId,
+      }
+    );
+    return stream;
+  } catch (error) {
+    console.error("Error in submitQuestion:", error);
+    throw error;
+  }
 }

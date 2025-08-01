@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "AI Chat App",
+  title: "Langsy Ai Agent",
   description: "A modern chat application built with Next.js and Convex",
 };
 
